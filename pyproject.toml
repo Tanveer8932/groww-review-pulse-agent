@@ -1,0 +1,94 @@
+[build-system]
+requires = ["hatchling>=1.25"]
+build-backend = "hatchling.build"
+
+[project]
+name = "groww-pulse"
+version = "0.1.0"
+description = "Groww Review Pulse Agent: weekly product-feedback pulse from public Google Play reviews."
+readme = "README.md"
+requires-python = ">=3.11"
+license = { text = "Proprietary" }
+dependencies = [
+    # Core
+    "pydantic>=2.8,<3",
+    "pydantic-settings>=2.4,<3",
+    "python-dotenv>=1.0,<2",
+    # Data
+    "pandas>=2.2,<3",
+    # Text (used from Phase 2 onwards)
+    "emoji>=2.12,<3",
+    "lingua-language-detector>=2.0,<3",
+    "rapidfuzz>=3.9,<4",
+    "scikit-learn>=1.5,<2",
+    # LLM (Phase 3)
+    "anthropic>=0.40",
+    "groq>=0.30",  # optional provider: LLM_PROVIDER=groq
+    # MCP (Phase 0 spike, Phase 5 delivery)
+    "mcp>=1.9,<2",
+    "httpx>=0.27,<1",
+    # UI / CLI
+    "streamlit>=1.38,<2",
+    "typer>=0.12,<1",
+    # Column-map files for the importer (Phase 1)
+    "pyyaml>=6.0,<7",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=8.3,<9",
+    "pytest-cov>=5.0",
+    "hypothesis>=6.100",
+    "ruff>=0.6",
+    "mypy>=1.11",
+    "pandas-stubs>=2.2",
+    "types-PyYAML>=6.0",
+    "pre-commit>=3.8",
+    "detect-secrets>=1.5",
+]
+
+[project.scripts]
+groww-pulse = "groww_pulse.cli:app"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/groww_pulse"]
+
+# ---------------------------------------------------------------- pytest
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-ra --strict-markers --cov=groww_pulse --cov-report=term-missing"
+markers = [
+    "live: hits real external services (MCP server, LLM). Skipped unless RUN_LIVE_TESTS=1.",
+]
+filterwarnings = ["error::pytest.PytestUnraisableExceptionWarning"]
+
+[tool.coverage.run]
+branch = true
+source = ["groww_pulse"]
+
+# ---------------------------------------------------------------- ruff
+[tool.ruff]
+line-length = 100
+target-version = "py311"
+src = ["src", "tests", "scripts", "app"]
+
+[tool.ruff.lint]
+select = ["E", "F", "W", "I", "N", "UP", "B", "BLE", "S", "SIM", "RUF", "PT", "T20"]
+ignore = [
+    "RUF001", "RUF002", "RUF003",  # allow unicode dashes/quotes in strings and docs
+]
+
+[tool.ruff.lint.per-file-ignores]
+"tests/**" = ["S101", "S105", "S106"]  # asserts and fake secrets are fine in tests
+"scripts/**" = ["T201"]               # CLI scripts print their report
+
+# ---------------------------------------------------------------- mypy
+[tool.mypy]
+python_version = "3.11"
+strict = true
+plugins = ["pydantic.mypy"]
+files = ["src", "scripts", "app"]
+
+[[tool.mypy.overrides]]
+module = ["streamlit.*", "sklearn.*"]
+ignore_missing_imports = true

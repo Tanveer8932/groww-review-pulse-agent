@@ -1,0 +1,216 @@
+{
+  "checked_at": "2026-10-14T12:01:02+00:00",
+  "endpoint": "https://mcp-server-4-production-0fca.up.railway.app/",
+  "auth_header_sent": false,
+  "http_context_not_a_health_signal": {
+    "/": {
+      "status": 200,
+      "body": "{\"service\":\"google-workspace-mcp-server\",\"status\":\"running\",\"endpoints\":{\"health\":\"/health\",\"oauthStart\":\"/oauth/start\",\"oauthCallback\":\"/oauth/callback\",\"mcp\":\"/\"}}"
+    },
+    "/health": {
+      "status": 200,
+      "body": "{\"status\":\"ok\"}"
+    }
+  },
+  "auth_enforced": false,
+  "mcp_handshake": {
+    "ok": true,
+    "protocolVersion": "2025-11-25",
+    "serverInfo": {
+      "name": "google-workspace-mcp-server",
+      "title": null,
+      "version": "1.0.0",
+      "websiteUrl": null,
+      "icons": null
+    },
+    "capabilities": {
+      "tools": {
+        "listChanged": true
+      }
+    }
+  },
+  "tools": [
+    {
+      "name": "gmail_create_draft",
+      "title": "Create Gmail Draft",
+      "description": "Create a Gmail draft for the authenticated Google account. This does not send the email.",
+      "inputSchema": {
+        "type": "object",
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "properties": {
+          "to": {
+            "minItems": 1,
+            "type": "array",
+            "items": {
+              "type": "string",
+              "format": "email",
+              "pattern": "^(?!\\.)(?!.*\\.\\.)([A-Za-z0-9_'+\\-\\.]*)[A-Za-z0-9_+-]@([A-Za-z0-9][A-Za-z0-9\\-]*\\.)+[A-Za-z]{2,}$"
+            }
+          },
+          "cc": {
+            "default": [],
+            "type": "array",
+            "items": {
+              "type": "string",
+              "format": "email",
+              "pattern": "^(?!\\.)(?!.*\\.\\.)([A-Za-z0-9_'+\\-\\.]*)[A-Za-z0-9_+-]@([A-Za-z0-9][A-Za-z0-9\\-]*\\.)+[A-Za-z]{2,}$"
+            }
+          },
+          "bcc": {
+            "default": [],
+            "type": "array",
+            "items": {
+              "type": "string",
+              "format": "email",
+              "pattern": "^(?!\\.)(?!.*\\.\\.)([A-Za-z0-9_'+\\-\\.]*)[A-Za-z0-9_+-]@([A-Za-z0-9][A-Za-z0-9\\-]*\\.)+[A-Za-z]{2,}$"
+            }
+          },
+          "subject": {
+            "type": "string",
+            "minLength": 1
+          },
+          "body": {
+            "type": "string",
+            "minLength": 1
+          },
+          "bodyType": {
+            "default": "text",
+            "type": "string",
+            "enum": [
+              "text",
+              "html"
+            ]
+          }
+        },
+        "required": [
+          "to",
+          "subject",
+          "body"
+        ],
+        "additionalProperties": false
+      },
+      "annotations": {
+        "readOnlyHint": false,
+        "destructiveHint": false,
+        "idempotentHint": false,
+        "openWorldHint": true
+      }
+    },
+    {
+      "name": "gmail_send_email",
+      "title": "Send Gmail Email",
+      "description": "Send an email through the authenticated Google account. This causes an external side effect and sends immediately.",
+      "inputSchema": {
+        "type": "object",
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "properties": {
+          "to": {
+            "minItems": 1,
+            "type": "array",
+            "items": {
+              "type": "string",
+              "format": "email",
+              "pattern": "^(?!\\.)(?!.*\\.\\.)([A-Za-z0-9_'+\\-\\.]*)[A-Za-z0-9_+-]@([A-Za-z0-9][A-Za-z0-9\\-]*\\.)+[A-Za-z]{2,}$"
+            }
+          },
+          "cc": {
+            "default": [],
+            "type": "array",
+            "items": {
+              "type": "string",
+              "format": "email",
+              "pattern": "^(?!\\.)(?!.*\\.\\.)([A-Za-z0-9_'+\\-\\.]*)[A-Za-z0-9_+-]@([A-Za-z0-9][A-Za-z0-9\\-]*\\.)+[A-Za-z]{2,}$"
+            }
+          },
+          "bcc": {
+            "default": [],
+            "type": "array",
+            "items": {
+              "type": "string",
+              "format": "email",
+              "pattern": "^(?!\\.)(?!.*\\.\\.)([A-Za-z0-9_'+\\-\\.]*)[A-Za-z0-9_+-]@([A-Za-z0-9][A-Za-z0-9\\-]*\\.)+[A-Za-z]{2,}$"
+            }
+          },
+          "subject": {
+            "type": "string",
+            "minLength": 1
+          },
+          "body": {
+            "type": "string",
+            "minLength": 1
+          },
+          "bodyType": {
+            "default": "text",
+            "type": "string",
+            "enum": [
+              "text",
+              "html"
+            ]
+          }
+        },
+        "required": [
+          "to",
+          "subject",
+          "body"
+        ],
+        "additionalProperties": false
+      },
+      "annotations": {
+        "readOnlyHint": false,
+        "destructiveHint": true,
+        "idempotentHint": false,
+        "openWorldHint": true
+      }
+    },
+    {
+      "name": "google_docs_append_content",
+      "title": "Append Google Doc Content",
+      "description": "Append content to the end of an existing Google Doc that the authenticated Google account is allowed to edit.",
+      "inputSchema": {
+        "type": "object",
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "properties": {
+          "documentId": {
+            "type": "string",
+            "minLength": 1
+          },
+          "content": {
+            "type": "string",
+            "minLength": 1
+          },
+          "tabId": {
+            "type": "string"
+          },
+          "ensureLeadingNewline": {
+            "default": false,
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "documentId",
+          "content"
+        ],
+        "additionalProperties": false
+      },
+      "annotations": {
+        "readOnlyHint": false,
+        "destructiveHint": false,
+        "idempotentHint": false,
+        "openWorldHint": true
+      }
+    }
+  ],
+  "contract": {
+    "compatible": true,
+    "observed_tools": [
+      "gmail_create_draft",
+      "gmail_send_email",
+      "google_docs_append_content"
+    ],
+    "missing_tools": [],
+    "schema_problems": [],
+    "forbidden_tools_present": [
+      "gmail_send_email"
+    ]
+  }
+}

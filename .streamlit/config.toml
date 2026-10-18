@@ -1,0 +1,15 @@
+# Streamlit settings for the Groww Review Pulse dashboard (no secrets here; see .env.example).
+
+[browser]
+# Do not send usage statistics to Streamlit.
+gatherUsageStats = false
+
+[client]
+# Show only the exception type for uncaught errors, never messages or stack traces,
+# which could contain configuration values.
+showErrorDetails = "type"
+# Hide developer options (deploy, clear cache) from viewers.
+toolbarMode = "viewer"
+
+[server]
+headless = true
