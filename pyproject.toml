@@ -15,7 +15,7 @@ dependencies = [
     "pydantic-settings>=2.4,<3",
     "python-dotenv>=1.0,<2",
     # Data
-    "pandas>=2.2,<3",
+    "pandas>=2.2,<4",
     # Text (used from Phase 2 onwards)
     "emoji>=2.12,<3",
     "lingua-language-detector>=2.0,<3",
