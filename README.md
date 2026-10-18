@@ -43,6 +43,7 @@ pre-commit install
 | MCP health + security gate (read-only, no tool calls) | `groww-pulse check-mcp` |
 | Preview delivery (dry run: no network calls) | `groww-pulse publish [--pulse data/runs/<run_id>]` |
 | Deliver: Doc append + Gmail **draft** (needs `DELIVERY_MODE=confirm`) | `groww-pulse publish --confirm [--force]` |
+| Export a read-only dashboard snapshot (for a hosted UI; review IDs withheld) | `groww-pulse export-snapshot [--pulse data/runs/<run_id>]` |
 | Verify MCP (Phase 0 script, read-only) | `python scripts/check_mcp.py` |
 | Re-lock dependencies | `uv lock && uv export --no-dev --no-hashes --no-emit-project -o requirements.txt` |
 
@@ -75,6 +76,54 @@ the confirmation box is ticked. It appends to the Doc and creates a Gmail **draf
 is no send control, and `--force` is CLI-only.
 
 With no validated pulse, the dashboard shows the commands that produce one.
+
+### Hosted dashboard (Streamlit Community Cloud)
+
+`data/` is gitignored (raw reviews, the redacted store, caches, and the delivery ledger), so
+a hosted app has no pulse of its own. It shows the committed **read-only snapshot** in
+`snapshot/` instead, which is used only when `DATA_DIR` holds no verified pulse. A local
+`DATA_DIR` always wins.
+
+Refresh the snapshot after a new report, then review and commit `snapshot/`:
+
+```bash
+groww-pulse export-snapshot            # newest verified pulse; or --pulse data/runs/<run_id>
+```
+
+- **What is copied:** the verified pulse (`pulse.txt` and `pulse.md` byte-for-byte; in
+  `pulse.json`, the themes, verbatim quotes, actions, numbers, body, content hash, and
+  validator results), the preprocessing funnel counts, and the analysis method and input
+  counts.
+- **Real data only:** synthetic pulses are refused. The export re-runs every publish check
+  on the source and again on the written copy. The dashboard checks it a third time when
+  it loads.
+- **What is withheld:**
+  - Google Play review IDs: theme member lists are emptied, and quote IDs become
+    `withheld-N`;
+  - per-review theme assignments;
+  - local paths and preprocessing settings;
+  - LLM usage;
+  - the whole delivery ledger.
+
+  `snapshot/snapshot.json` keeps the SHA-256 of each source file, plus a per-target delivery
+  summary as it stood at export, with no ledger keys, run IDs, Doc IDs, or recipients.
+- **Delivery is disabled for a snapshot.** Without the ledger, duplicate protection can't
+  work, so preview and delivery stay CLI-only.
+
+**Secrets.** In the app's **Settings → Secrets**, add root-level TOML keys. Streamlit Cloud
+exposes them as environment variables, which is where the app reads its settings. Never
+commit `.streamlit/secrets.toml` (it is gitignored).
+
+```toml
+LLM_PROVIDER = "groq"      # the default model is then openai/gpt-oss-120b
+GROQ_API_KEY = "<your Groq key>"
+# Optional; leave unset for a view-only deployment (delivery from a snapshot is disabled).
+# DELIVERY_MODE = "dry_run"
+```
+
+The dashboard itself never calls the LLM: analysis runs only in `groww-pulse analyze`. With
+these secrets, the Settings tab reports "LLM analysis: configured", and the key is shown
+only as set / not set.
 
 ## LLM provider (Phase 3)
 

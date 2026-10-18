@@ -1,0 +1,28 @@
+{
+  "schema_version": 1,
+  "kind": "groww-pulse-dashboard-snapshot",
+  "exported_at": "2026-10-18T08:56:29.153332+00:00",
+  "iso_week": "2026-W42",
+  "content_hash": "84d6f68b6fc08a6c150a5ea4580a1a9fd5183a1d30b1ae5a4cdcb5ad72d82656",
+  "pulse_run_id": "20261017T064855Z-4dc798",
+  "preprocess_run_id": "20261014T173649Z-933c14",
+  "analysis_run_id": "20261015T053916Z-966fe1",
+  "source_sha256": {
+    "pulse.json": "b9986e424ae787a2d03eb1e9382feefbce578405a59762e72c51ffb20c557f07",
+    "pulse.txt": "9b136f1000c00a56e65076c49038baa234b26c34bc42990022c0d1690f049185",
+    "pulse.md": "6fdca7e7060e8fc5c9c17b4c37ae9e9a2557fb85cb4f0b16d977013ab44cfc84",
+    "funnel.json": "30bf94f1df41bd9c33e8fe6090a0b9e83dc46285f3c58f07cdb76fa9e8cbf522",
+    "analysis.json": "13bd53b468b6d1250dca74705b9d72ebe1000a5f7c084b2af4bfc727d9631b8a"
+  },
+  "delivery": {
+    "google_doc": "blocked_week_already_delivered",
+    "gmail_draft": "blocked_week_already_delivered"
+  },
+  "withheld": [
+    "Google Play review IDs (theme member lists and quote review IDs)",
+    "per-review theme assignments and other review-level analysis data",
+    "local file paths and preprocessing settings",
+    "LLM token usage",
+    "the delivery ledger (keys, run IDs, timestamps)"
+  ]
+}

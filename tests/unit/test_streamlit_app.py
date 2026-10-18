@@ -52,6 +52,8 @@ def no_env(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> Path:
     ):  # fmt: skip
         monkeypatch.delenv(name, raising=False)
     monkeypatch.setenv("LOG_LEVEL", "WARNING")
+    # Keep the repository's committed snapshot out of tests that expect an empty app.
+    monkeypatch.setenv("SNAPSHOT_DIR", str(tmp_path / "no-snapshot"))
     return tmp_path
 
 
@@ -385,3 +387,56 @@ def test_existing_delivery_of_this_pulse_is_not_shown_as_blocked(
     assert statuses == ["succeeded", "not delivered"]
     assert not any("Blocked" in e.value for e in at.error)
     assert "duplicate-week protection" not in _all_text(at)
+
+
+# ---------------------------------------------------------------- hosted: committed snapshot
+COMMITTED_SNAPSHOT = Path(__file__).parents[2] / "snapshot"
+
+
+@pytest.mark.skipif(
+    not (COMMITTED_SNAPSHOT / "snapshot.json").exists(), reason="no committed snapshot"
+)
+def test_hosted_app_shows_the_committed_real_snapshot_read_only(
+    no_env: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Like Streamlit Cloud: no DATA_DIR content, the repository's snapshot/ is used."""
+    monkeypatch.delenv("SNAPSHOT_DIR")
+    _configure_live(monkeypatch)  # even fully configured, a snapshot cannot be delivered
+    at = _run()
+    board = dashboard.load_dashboard(
+        load_settings(env_file=None, data_dir=no_env / "data"), snapshot_dir=COMMITTED_SNAPSHOT
+    )
+    assert board.pulse is not None
+    pulse = board.pulse.pulse
+    text = _all_text(at)
+    assert at.tabs[0].label == "Weekly pulse"
+    assert "Read-only snapshot of the 2026-W42 pulse" in text
+    assert "SYNTHETIC" not in text
+    assert "6 / 6" in text
+    for theme in pulse.themes:
+        assert theme.name in text
+    shown = [re.sub(r"\\(.)", r"\1", m.value) for m in at.markdown]
+    for q in pulse.quotes:
+        assert quote_display(q) in shown
+    assert "withheld-" not in text
+    assert "review `" not in text
+    assert "Preprocessing funnel" in [s.value for s in at.subheader]
+    # Delivery: status from the manifest, no preview / confirm / deliver controls.
+    assert _delivery_statuses(at) == ["blocked: week already delivered with different content"] * 2
+    assert "Delivery is disabled here" in text
+    keys = {w.key for w in (*at.button, *at.checkbox)}
+    assert not keys & {"preview", "deliver", "confirm_delivery"}
+
+
+def test_groq_secrets_configure_llm_readiness_without_being_shown(
+    no_env: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Streamlit Cloud exposes root-level secrets as environment variables."""
+    fake_key = "gsk_fake_value_for_ui_test_" + "x" * 20
+    monkeypatch.setenv("LLM_PROVIDER", "groq")
+    monkeypatch.setenv("GROQ_API_KEY", fake_key)
+    at = _run()
+    assert any(s.value == "LLM analysis: configured" for s in at.success)
+    text = _all_text(at)
+    assert fake_key not in text
+    assert "openai/gpt-oss-120b" in text  # the Groq default model, never a Claude model

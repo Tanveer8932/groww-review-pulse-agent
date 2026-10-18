@@ -375,3 +375,18 @@ def test_publish_confirm_cannot_bypass_the_week_lock(
         assert isinstance(targets, list)
         assert {t["status"] for t in targets} == {"blocked_week_already_delivered"}
     assert len(fake.calls) == calls_before
+
+
+def test_export_snapshot_refuses_synthetic_and_missing_pulses(workdir: Path) -> None:
+    from groww_pulse.config import load_settings
+    from tests.fixtures.report import build_pulse
+
+    missing = runner.invoke(app, ["export-snapshot", "--out", str(workdir / "snap")])
+    assert missing.exit_code == 1
+    assert "no pulse.json found" in missing.stderr
+
+    build_pulse(load_settings(env_file=None, data_dir=workdir / "data"))
+    refused = runner.invoke(app, ["export-snapshot", "--out", str(workdir / "snap")])
+    assert refused.exit_code == 1
+    assert "synthetic" in refused.stderr
+    assert not (workdir / "snap").exists()

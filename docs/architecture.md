@@ -359,7 +359,7 @@ Google OAuth variables (`GOOGLE_CLIENT_ID`, etc.) belong to the **MCP server's**
 | Target | Notes |
 |---|---|
 | **Railway (recommended for production)** | Dockerfile runs `streamlit run app/streamlit_app.py --server.port $PORT --server.address 0.0.0.0`. A persistent volume is mounted at `DATA_DIR` for the ledger and cache. Env vars live in the Railway dashboard. An optional Railway cron service runs `groww-pulse run --confirm` weekly |
-| **Streamlit Community Cloud** | `requirements.txt` + `st.secrets`. The disk is ephemeral, so the ledger is per-session. Suitable for demo and preview with manual publishing |
+| **Streamlit Community Cloud** | `requirements.txt` + `st.secrets` (root-level keys become environment variables: `LLM_PROVIDER="groq"`, `GROQ_API_KEY`). `data/` is not deployed, so the app shows the committed read-only `snapshot/` (`groww-pulse export-snapshot`: one verified real pulse, review IDs and the ledger withheld) and disables delivery. Read-only showcase; publish from the CLI |
 
 The MCP server stays a separate deployment. This app talks to it only over HTTPS.
 

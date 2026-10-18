@@ -7,7 +7,8 @@ adds ``analyze`` (themes, ranking, verified quotes, and action ideas into
 ``runs/{run_id}/analysis.json``). Phase 4 adds ``report`` (verified weekly pulse into
 ``runs/{run_id}/pulse.{md,txt,json}``; nothing is published). Phase 5 adds ``check-mcp``
 (read-only MCP health and auth check) and ``publish`` (dry run by default; ``--confirm``
-appends to the Google Doc and creates a Gmail draft; email is never sent).
+appends to the Google Doc and creates a Gmail draft; email is never sent). Phase 6 adds
+``export-snapshot`` (a verified pulse as a read-only, committable dashboard snapshot).
 """
 
 from __future__ import annotations
@@ -44,6 +45,7 @@ from groww_pulse.errors import (
 from groww_pulse.logging_setup import bind_run_id, configure_logging
 from groww_pulse.preprocessing.pipeline import run_preprocessing
 from groww_pulse.report.pipeline import run_report
+from groww_pulse.snapshot import export_snapshot
 
 app = typer.Typer(
     name="groww-pulse",
@@ -202,6 +204,33 @@ def report_command(
     typer.echo(json.dumps(result.summary(), indent=2, ensure_ascii=False))
     for warning in result.warnings:
         typer.echo(f"Warning: {warning}", err=True)
+    raise typer.Exit(EXIT_OK)
+
+
+@app.command("export-snapshot")
+def export_snapshot_command(
+    pulse: Annotated[
+        Path | None,
+        typer.Option(
+            "--pulse",
+            help="pulse.json (or its run directory). Default: the newest under DATA_DIR/runs.",
+            exists=True,
+            readable=True,
+        ),
+    ] = None,
+    out: Annotated[
+        Path,
+        typer.Option("--out", help="Snapshot directory to (re)write. Commit it for a hosted UI."),
+    ] = Path("snapshot"),
+) -> None:
+    """Export one verified real pulse as a read-only dashboard snapshot (review IDs withheld)."""
+    settings = _settings()
+    try:
+        result = export_snapshot(settings.data_dir, out, pulse_path=pulse)
+    except DeliveryError as exc:
+        typer.echo(f"Snapshot refused: {exc}", err=True)
+        raise typer.Exit(EXIT_PARTIAL) from None
+    typer.echo(json.dumps(result.manifest, indent=2, ensure_ascii=False))
     raise typer.Exit(EXIT_OK)
 
 

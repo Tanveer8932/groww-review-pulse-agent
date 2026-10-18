@@ -17,6 +17,12 @@ Everything the UI shows comes from stored, verified artefacts; nothing is genera
   was only partly delivered by another version and that version's pulse is still on disk
   and verifies, it is loaded as :attr:`Dashboard.recovery` so the UI can finish it.
 
+* **Snapshot fallback.** When ``DATA_DIR`` holds no verified pulse (a hosted app, where
+  ``data/`` is not deployed) and a committed :mod:`~groww_pulse.snapshot` exists, the pulse
+  and its statistics are read from the snapshot instead, through the same publish checks.
+  A snapshot is read-only: there is no ledger, and :func:`live_delivery_blockers` refuses
+  delivery. Its delivery status comes from the manifest summary.
+
 :func:`preview_delivery`, :func:`deliver`, and :func:`check_mcp` are thin wrappers over the
 Phase 5 publisher and client, so the UI uses exactly the CLI's code paths and safeguards.
 """
@@ -51,6 +57,7 @@ from groww_pulse.delivery.publisher import (
 from groww_pulse.errors import ConfigError, DeliveryError
 from groww_pulse.models import Pulse
 from groww_pulse.report.pipeline import PULSE_JSON
+from groww_pulse.snapshot import read_manifest
 
 FUNNEL_FILE = "funnel.json"
 ANALYSIS_FILE = "analysis.json"
@@ -137,6 +144,7 @@ class Dashboard:
     recovery_problem: str | None = None  # why that version cannot be finished here
     problems: list[str] = field(default_factory=list)  # artefacts that could not be read
     ledger_error: str | None = None
+    snapshot: dict[str, Any] | None = None  # manifest, when shown from a committed snapshot
 
     @property
     def validators_passed(self) -> bool:
@@ -256,10 +264,33 @@ def _delivery_rows(
     return current, list(others.values())
 
 
-def load_dashboard(settings: Settings, *, allow_synthetic: bool = False) -> Dashboard:
-    """Everything the dashboard shows; never raises for missing or invalid artefacts."""
+def load_dashboard(
+    settings: Settings, *, allow_synthetic: bool = False, snapshot_dir: Path | None = None
+) -> Dashboard:
+    """Everything the dashboard shows; never raises for missing or invalid artefacts.
+
+    ``DATA_DIR`` comes first. Only if it has no verified pulse is ``snapshot_dir`` used.
+    """
+    dashboard = _load_from(settings, settings.data_dir, allow_synthetic=allow_synthetic)
+    if dashboard.pulse is not None or snapshot_dir is None:
+        return dashboard
+    manifest = read_manifest(snapshot_dir)
+    if manifest is None:
+        return dashboard
+    snap = _load_from(settings, snapshot_dir, allow_synthetic=allow_synthetic, ledger=False)
+    if snap.pulse is None:
+        dashboard.rejected += snap.rejected
+        return dashboard
+    snap.rejected = dashboard.rejected + snap.rejected
+    snap.snapshot = manifest
+    return snap
+
+
+def _load_from(
+    settings: Settings, data_dir: Path, *, allow_synthetic: bool, ledger: bool = True
+) -> Dashboard:
     dashboard = Dashboard()
-    for _created, path in _pulse_candidates(settings.data_dir):
+    for _created, path in _pulse_candidates(data_dir):
         try:
             dashboard.pulse = _load_pulse(path, allow_synthetic=allow_synthetic)
         except DeliveryError as exc:
@@ -275,16 +306,18 @@ def load_dashboard(settings: Settings, *, allow_synthetic: bool = False) -> Dash
 
     directory = dashboard.pulse.directory
     if run := _source_run(directory, "preprocess_run_id"):
-        dashboard.funnel = _load_funnel(settings.data_dir, run)
+        dashboard.funnel = _load_funnel(data_dir, run)
         if dashboard.funnel is None:
             dashboard.problems.append(f"preprocessing funnel for run {run} is missing")
     if run := _source_run(directory, "analysis_run_id"):
-        dashboard.analysis = _load_analysis(settings.data_dir, run)
+        dashboard.analysis = _load_analysis(data_dir, run)
         if dashboard.analysis is None:
             dashboard.problems.append(f"analysis for run {run} is missing")
+    if not ledger:
+        return dashboard
 
     try:
-        entries = DeliveryLedger(settings.data_dir / LEDGER_FILE).entries()
+        entries = DeliveryLedger(data_dir / LEDGER_FILE).entries()
     except DeliveryError as exc:
         dashboard.ledger_error = str(exc)
         return dashboard
@@ -335,6 +368,11 @@ def live_delivery_blockers(
     way to override a week lock from the UI.
     """
     blockers = []
+    if dashboard.snapshot is not None:
+        blockers.append(
+            "this is a read-only snapshot with no delivery ledger; deliver from the CLI "
+            "where DATA_DIR and the ledger live"
+        )
     view = view or dashboard.pulse
     if view is None:
         blockers.append("there is no validated pulse")

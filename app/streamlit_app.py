@@ -17,6 +17,11 @@ Delivery reuses the Phase 5 publisher unchanged:
   version reached only some targets, a separate section lets the operator finish *that*
   version, behind the same preview and confirmation gate.
 
+When ``DATA_DIR`` has no verified pulse (a hosted app: ``data/`` is never deployed), the
+committed read-only snapshot in ``snapshot/`` is shown instead (``groww-pulse
+export-snapshot``). It passes the same checks; review IDs are withheld, and delivery from a
+snapshot is disabled because the delivery ledger is not deployed.
+
 Run locally:  streamlit run app/streamlit_app.py
 """
 
@@ -24,6 +29,7 @@ from __future__ import annotations
 
 import json
 import re
+from pathlib import Path
 from typing import Any
 
 import streamlit as st
@@ -35,6 +41,16 @@ from groww_pulse.delivery.ledger import Target
 from groww_pulse.errors import ConfigError, DeliveryError
 from groww_pulse.logging_setup import bind_run_id, configure_logging, mask
 from groww_pulse.report.render import quote_display
+from groww_pulse.snapshot import BLOCKED_WEEK, DELIVERED, NO_LEDGER, NOT_DELIVERED, UNCERTAIN
+
+DEFAULT_SNAPSHOT_DIR = Path(__file__).resolve().parents[1] / "snapshot"
+SNAPSHOT_STATUS = {
+    DELIVERED: "delivered",
+    BLOCKED_WEEK: "blocked: week already delivered with different content",
+    UNCERTAIN: "blocked: another version's outcome is unknown",
+    NOT_DELIVERED: "not delivered",
+    NO_LEDGER: "unknown (no ledger at export)",
+}
 
 TARGET_LABELS = {
     Target.GOOGLE_DOC.value: "Google Doc append",
@@ -153,7 +169,8 @@ def _themes_tab(board: dashboard.Dashboard, view: dashboard.DashboardPulse) -> N
             st.markdown(_md(quote_display(q)))
             st.caption(
                 f"{q.rating}★ · {q.created_at.date().isoformat()} · "
-                f"{names.get(q.theme_id, q.theme_id)} · review `{q.review_id}`"
+                f"{names.get(q.theme_id, q.theme_id)}"
+                + ("" if q.review_id.startswith("withheld-") else f" · review `{q.review_id}`")
             )
 
     st.subheader("Action ideas")
@@ -236,9 +253,37 @@ def _status_label(row: dashboard.DeliveryRow | None, blocked: bool) -> str:
     return row.status if row else "not delivered"
 
 
+def _snapshot_delivery_tab(board: dashboard.Dashboard, view: dashboard.DashboardPulse) -> None:
+    manifest = board.snapshot or {}
+    st.subheader("Delivery status for this pulse")
+    st.dataframe(
+        [
+            {
+                "Target": TARGET_LABELS.get(target, target),
+                "Status": SNAPSHOT_STATUS.get(status, status),
+            }
+            for target, status in (manifest.get("delivery") or {}).items()
+        ],
+        hide_index=True,
+    )
+    st.caption(
+        f"As recorded in the local delivery ledger when the snapshot was exported "
+        f"({dashboard.format_timestamp(str(manifest.get('exported_at', '')))})."
+    )
+    st.warning(
+        "Delivery is disabled here: this page shows a read-only snapshot of "
+        f"{view.verified.iso_week}, and the delivery ledger that prevents duplicate Doc "
+        "sections and drafts is not deployed. Preview and deliver from the CLI "
+        "(`groww-pulse publish`) on the machine that holds DATA_DIR."
+    )
+
+
 def _delivery_tab(
     settings: Settings, board: dashboard.Dashboard, view: dashboard.DashboardPulse
 ) -> None:
+    if board.snapshot is not None:
+        _snapshot_delivery_tab(board, view)
+        return
     verified = view.verified
     week_blocks = view.week_blocks()
 
@@ -431,7 +476,9 @@ def main() -> None:
 
     with st.spinner("Loading and re-verifying the latest weekly pulse…"):
         try:
-            board = dashboard.load_dashboard(settings)
+            board = dashboard.load_dashboard(
+                settings, snapshot_dir=settings.snapshot_dir or DEFAULT_SNAPSHOT_DIR
+            )
         except OSError as exc:
             st.error(f"Could not read DATA_DIR ({settings.data_dir}): {type(exc).__name__}")
             st.stop()
@@ -445,6 +492,13 @@ def main() -> None:
         return
     if view.synthetic:
         st.warning("SYNTHETIC TEST DATA — this pulse is not for publication.")
+    if board.snapshot is not None:
+        st.info(
+            f"Read-only snapshot of the {view.verified.iso_week} pulse (report run "
+            f"{view.run_id}), exported "
+            f"{dashboard.format_timestamp(str(board.snapshot.get('exported_at', '')))} and "
+            "re-verified on load. Review IDs are withheld; delivery is disabled."
+        )
 
     pulse_tab, themes_tab, stats_tab, delivery_tab, config_tab = st.tabs(
         ["Weekly pulse", "Themes, quotes & actions", "Review statistics", "Delivery", "Settings"]

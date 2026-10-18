@@ -97,6 +97,9 @@ class Settings(BaseSettings):
 
     # Storage / ops
     data_dir: Path = Path("./data")
+    # Read-only dashboard snapshot used when DATA_DIR has no pulse (hosted UI). Unset: the
+    # app uses the `snapshot/` directory next to `app/`.
+    snapshot_dir: Path | None = None
     raw_retention_days: int = Field(default=90, ge=1)
     log_level: LogLevel = "INFO"
     log_format: LogFormat = "json"
@@ -208,6 +211,7 @@ class Settings(BaseSettings):
             "PULSE_EMAIL_TO": f"{len(self.pulse_recipients)} recipient(s)",
             "DELIVERY_MODE": self.delivery_mode.value,
             "DATA_DIR": str(self.data_dir),
+            "SNAPSHOT_DIR": str(self.snapshot_dir) if self.snapshot_dir else "(default)",
             "RAW_RETENTION_DAYS": str(self.raw_retention_days),
             "LOG_LEVEL": self.log_level,
         }
