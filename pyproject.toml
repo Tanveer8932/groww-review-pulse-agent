@@ -25,7 +25,7 @@ dependencies = [
     "anthropic>=0.40",
     "groq>=0.30",  # optional provider: LLM_PROVIDER=groq
     # MCP (Phase 0 spike, Phase 5 delivery)
-    "mcp>=1.9,<2",
+    "mcp>=1.9,<3",
     "httpx>=0.27,<1",
     # UI / CLI
     "streamlit>=1.38,<2",
