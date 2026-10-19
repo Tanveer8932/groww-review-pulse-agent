@@ -156,7 +156,7 @@ This section records what was built and evidenced. It does not change the requir
 | No email sent; send tool blocked and tested | **Met** | `email_sent: false` in every delivery record; `gmail_send_email` raises `ForbiddenToolError` before any network call (tested) |
 | Re-running the same week causes no duplicate delivery | **Met** | A second `publish --confirm` of the same pulse gave `skipped_already_delivered` on both targets. A corrected Week 42 pulse (`84d6f68b…`) was not delivered again because of duplicate-week protection (`blocked_week_already_delivered`) |
 | Streamlit app deployed and reachable; health check confirms MCP tool discovery | **Partly met** | Deployed on Streamlit Community Cloud at <https://groww-review-pulse-agent-2nza7oxgal2ywzeqg36n9m.streamlit.app/> as a read-only snapshot. Delivery and the MCP health check are disabled there by design (no ledger in the cloud). The MCP health check (`initialize` + `tools/list` + auth probe) runs from the CLI and a local dashboard, and passed inside the 2026-10-17 publish |
-| All tests pass in CI; documentation matches what was built | **Not met in CI** | Locally on 2026-10-19: 989 passed, 3 skipped (opt-in live tests). The GitHub Actions run stops at its secret-scan step, which flags the SHA-256 digests in `snapshot/` (pre-commit exempts them; the CI step does not), so CI never reaches the tests |
+| All tests pass in CI; documentation matches what was built | **Met** | GitHub Actions CI passes at commit `2e289cd` on Python 3.11 and 3.12 ([run 39209919490](https://github.com/Tanveer8932/groww-review-pulse-agent/actions/runs/39209919490)): 989 passed, 3 skipped (opt-in live tests), with lint, type check, and secret scan clean |
 
 ### Goals and requirements built differently
 

@@ -418,7 +418,7 @@ Run locally on 2026-10-19 on Windows, Python 3.11, at commit `da4477d` (applicat
 | `ruff check`, `ruff format --check` | Clean |
 | `mypy` (strict; `src`, `scripts`, `app`) | Clean |
 | pre-commit (including `detect-secrets` and `detect-private-key`) | All hooks pass |
-| GitHub Actions CI (`.github/workflows/ci.yml`) | **Failing** on this branch since `61870f9`. Lint and type check pass, but the CI secret-scan step flags the SHA-256 digests in `snapshot/` as high-entropy strings: it does not pass the `--exclude-lines` rule that pre-commit uses. The job stops there, so CI does not run the tests |
+| GitHub Actions CI (`.github/workflows/ci.yml`) | **Passing** at commit `2e289cd` ([run 39209919490](https://github.com/Tanveer8932/groww-review-pulse-agent/actions/runs/39209919490)), on Python 3.11 and 3.12: lint, type check, secret scan, and 989 passed, 3 skipped. The CI secret scan uses the same snapshot-digest exemption as pre-commit |
 
 Unit tests mock the LLM and MCP. MCP tests use a fake server that serves the tool
 definitions recorded from the real server. Test fixtures are synthetic and labelled. The
@@ -480,9 +480,6 @@ status is "blocked: another version of this week was already delivered".
   the full pulse, not a Doc link.
 - **Trust in the MCP server.** The client verifies that the server enforces bearer auth. It
   cannot verify which Google account the server uses.
-- **CI is red.** The GitHub Actions secret-scan step lacks the snapshot-digest exemption
-  that pre-commit has, so CI fails before its test step (see [Test results](#test-results)).
-  The fix is a one-line workflow change, not yet made.
 
 ## Assignment deliverables
 
