@@ -34,8 +34,14 @@ jobs:
       - name: Type check
         run: uv run --no-sync mypy
 
+      # Same rules as the detect-secrets hook in .pre-commit-config.yaml; keep them in sync.
+      # --exclude-lines ignores only SHA-256 content digests in the dashboard snapshot.
       - name: Secret scan
-        run: git ls-files -z | xargs -0 uv run --no-sync detect-secrets-hook --baseline .secrets.baseline --exclude-files '(^uv\.lock$|^requirements.*\.txt$)'
+        run: |
+          git ls-files -z | xargs -0 uv run --no-sync detect-secrets-hook \
+            --baseline .secrets.baseline \
+            --exclude-files '(^uv\.lock$|^requirements.*\.txt$)' \
+            --exclude-lines '^\s*"([a-z_]*(sha256|hash)|pulse\.(json|txt|md)|funnel\.json|analysis\.json)": "[0-9a-f]{64}",?$'
 
       - name: Tests
         run: uv run --no-sync pytest
