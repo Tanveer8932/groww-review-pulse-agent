@@ -2,10 +2,10 @@
 
 | Field | Value |
 |---|---|
-| Status | **Fix implemented locally, not deployed** (2026-10-15, see §5). The deployed server is still unauthenticated until the patched build is pushed and deployed |
+| Status | **Bearer-auth deployment live and verified** (2026-10-17, see §6). A Railway deployment at `https://mcp-server-4-production-b6ec.up.railway.app/` rejects handshakes without credentials and with a wrong token, and the client's security gate passed before the real delivery. §1–§3 describe the original deployment as assessed on 2026-10-14; §5 records the local fix of 2026-10-15 |
 | Assessed | 2026-10-14 |
-| Target | `saksham20189575/mcp-server-4` @ `203fa75` (upstream HEAD re-checked 2026-10-14), deployed at `https://mcp-server-4-production-0fca.up.railway.app/` |
-| Owner of fix | Whoever controls that GitHub repo and Railway service. **Ownership is unconfirmed:** it may not be this project's operator |
+| Target | `saksham20189575/mcp-server-4` @ `203fa75` (upstream HEAD re-checked 2026-10-14), deployed at `https://mcp-server-4-production-0fca.up.railway.app/` (assessed 2026-10-14). Delivery uses `https://mcp-server-4-production-b6ec.up.railway.app/` (§6) |
+| Owner of fix | Whoever controls that GitHub repo and Railway service. **Ownership of the original deployment is unconfirmed:** it may not be this project's operator |
 | Related | [mcp-contract.md](mcp-contract.md) |
 
 ## 1. Evidence
@@ -100,13 +100,13 @@ if (!isAuthorized(req.headers.authorization)) {
 | Code-level allowlist; `gmail_send_email` raises `ForbiddenToolError` before any I/O | Done (Phase 0; tested) |
 | `MCP_AUTH_TOKEN` sent as `Authorization: Bearer` when configured | Done (`scripts/check_mcp.py` and the Phase 5 client `delivery/mcp_client.py`) |
 | `check_mcp.py` reports whether the server **enforces** auth (re-handshakes without the header) | Done (2026-10-14) |
-| **Security gate enforced in code (Phase 5).** `publish --confirm` refuses (`SecurityGateError`, no writes) unless `MCP_AUTH_TOKEN` is set **and** handshakes with no credentials and with a wrong token are both rejected with 401/403. There is no override | Done (2026-10-14). Live read-only check that day: `auth_enforced: false`, so live delivery to the deployed server is **blocked** |
-| Delivery to production Doc and real recipients | **Blocked by the gate** until Step 1 is deployed. Steps 0.1 and 3 are strongly recommended too, and the authorized account must be confirmed by test writes (mcp-contract.md §6) |
+| **Security gate enforced in code (Phase 5).** `publish --confirm` refuses (`SecurityGateError`, no writes) unless `MCP_AUTH_TOKEN` is set **and** handshakes with no credentials and with a wrong token are both rejected with 401/403. There is no override | Done (2026-10-14). Live read-only check that day against the original deployment: `auth_enforced: false`, so delivery to it was **blocked**. On 2026-10-17 the `…-b6ec` deployment passed the gate (§6) |
+| Delivery to the configured Doc and recipients | **Done once (2026-10-17)** through the `…-b6ec` deployment after the gate passed: Doc `appended`, draft `draft_created`, `email_sent: false` (§6). The original `…-0fca` deployment stays blocked unless it enforces auth |
 | Alternative if the current owner cannot apply the fix | The operator deploys **their own fork** of mcp-server-4 with Steps 1–3, authorizes their own Google account, and points `MCP_SERVER_URL` at it. No code change is needed in this project |
 
 ## 5. Implementation status (2026-10-15)
 
-Steps 1–3 are implemented in a local copy of the server at `../mcp-server-4`, on branch `feat/bearer-auth` (based on `203fa75`). It is **not pushed and not deployed**. Server-side details are in that repo's `docs/authentication.md`.
+Steps 1–3 are implemented in a local copy of the server at `../mcp-server-4`, on branch `feat/bearer-auth` (based on `203fa75`). As of 2026-10-15 it was not pushed or deployed. §6 records the later Railway deployment. Server-side details are in that repo's `docs/authentication.md`.
 
 | Proposal | Implemented as |
 |---|---|
@@ -123,7 +123,21 @@ Steps 1–3 are implemented in a local copy of the server at `../mcp-server-4`, 
 | Railway (server) | `MCP_AUTH_TOKEN_SHA256` | Hash from `npm run auth:token`. **Set it before deploying**, otherwise the container exits at startup |
 | Railway (server) | `GOOGLE_TOKENS_JSON` | Recommended (output of `npm run tokens:env`), so no file token store is used |
 | Railway (server) | `ENABLED_TOOLS`, `ENABLE_OAUTH_ROUTES` | Leave unset (defaults are safe) |
-| Groww client `.env` | `MCP_SERVER_URL` | `https://mcp-server-4-production-0fca.up.railway.app/` (or a fork's URL) |
+| Groww client `.env` | `MCP_SERVER_URL` | The bearer-auth deployment's URL (used on 2026-10-17: `https://mcp-server-4-production-b6ec.up.railway.app/`) |
 | Groww client `.env` | `MCP_AUTH_TOKEN` | The plaintext token matching the hash |
 
-After deploying, re-run `groww-pulse check-mcp` against the live URL and record the result in `mcp-contract.md`.
+After deploying, re-run `groww-pulse check-mcp` against the live URL and record the result. §6 records the result for the `…-b6ec` deployment.
+
+## 6. Railway deployment with bearer auth (verified 2026-10-17)
+
+The confirmed publish of 2026-10-17 (UTC 06:25) ran the client's health check and security gate before writing. Its `delivery.json` (in `data/`, gitignored) records the following for `https://mcp-server-4-production-b6ec.up.railway.app/`:
+
+| Check | Observed |
+|---|---|
+| Handshake | `healthy: true`, protocol `2025-11-25`, server `google-workspace-mcp-server` 1.0.0 |
+| Contract | `compatible: true`; `tools/list` showed only `gmail_create_draft` and `google_docs_append_content`, so `forbidden_tools_present: []` |
+| Bearer auth | `auth_enforced: true`: "handshakes without credentials and with a wrong token were rejected"; our token was accepted (`credentials_rejected: false`) |
+| Security gate | `security_gate_passed: true` |
+| Writes | `google_docs_append_content`: `ok: true`, `status: appended`. `gmail_create_draft`: `ok: true`, `status: draft_created`. `email_sent: false` |
+
+These results match Steps 1 and 2 (§5). The repository does not record which server commit is deployed, the deployment's OAuth-route and token-store settings (Steps 0.1 and 3), or which Google account the server uses (S3). The original `…-0fca` deployment has not been re-checked since 2026-10-14.

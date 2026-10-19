@@ -2,7 +2,7 @@
 
 | Field | Value |
 |---|---|
-| Status | **Read-only handshake verified.** Test writes are not yet run; they need operator action (§6) |
+| Status | **Read-only handshake verified** against the original deployment (2026-10-14); the Phase 0 test writes in §6 were not recorded. **Update 2026-10-17:** a bearer-auth Railway deployment, `https://mcp-server-4-production-b6ec.up.railway.app/`, showed the same server name, protocol, and tool contract without `gmail_send_email`. It rejected handshakes without credentials and with a wrong token, and the real writes returned the §4 envelope (`ok: true`, `status: appended` / `draft_created`). See [mcp-server-security.md §6](mcp-server-security.md#6-railway-deployment-with-bearer-auth-verified-2026-10-17) |
 | Verified at | 2026-10-14T08:30:18Z; re-verified 2026-10-14T12:01Z (endpoint, tools, and `auth_enforced=false` unchanged); re-verified again with the Phase 5 client (`groww_pulse.delivery.mcp_client`, read-only: handshake, contract compatible, `auth_enforced=false`, security gate failed) |
 | Verified by | `scripts/check_mcp.py` (Python `mcp` SDK 1.30.0, Streamable HTTP) |
 | Raw output | [`mcp-tools-observed.json`](mcp-tools-observed.json), verbatim `tools/list` result |

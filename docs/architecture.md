@@ -13,7 +13,7 @@
 1. **Layered and separable.** Collection, preprocessing, analysis, reporting, and MCP delivery are independent packages. They communicate only through typed models and files, never through shared globals.
 2. **Code owns facts; the LLM owns language.** Counts, dates, rankings, quote extraction, and word limits are computed and validated in code. The LLM proposes theme names, groupings, and action wording. Code validates every LLM output before use.
 3. **Verify, never assume.** Quotes are verified against stored text. The MCP server is verified by an MCP `initialize` + `tools/list` handshake; a responding root URL proves nothing. Tool results are parsed, not presumed.
-4. **Safe by default.** Dry-run is the default, the MCP tool allowlist blocks sending email, live collection is opt-in, and secrets come only from the environment.
+4. **Safe by default.** Dry-run is the default, the MCP tool allowlist blocks sending email, automated collection is rejected (reviews enter only through `import`), and secrets come only from the environment.
 5. **Idempotent where it matters.** Imports upsert by `review_id`, LLM replies are cached by a hash of the prompt, every stage records the hashes of its inputs so later stages can detect stale outputs, and delivery is keyed in a ledger so re-runs never re-deliver.
 6. **Privacy before intelligence.** PII is redacted before text reaches the LLM, the UI, logs, or MCP.
 
@@ -329,7 +329,7 @@ publish(pulse_path, confirm, force):
 - A corrupt line refuses delivery rather than guessing.
 - The ledger lives only on the operator's machine (`DATA_DIR`). It is never committed or deployed, which is why the hosted dashboard cannot deliver (§6.8). An external ledger backend is a possible future extension.
 
-**Security gate** (decision, Phase 5): live delivery is refused unless `MCP_AUTH_TOKEN` is set **and** the server is observed rejecting unauthenticated clients. There is no override flag. On 2026-10-14 the original deployment (`mcp-server-4-production-0fca`) accepted a handshake with no credentials, so delivery to it was refused. On 2026-10-17 the configured Railway deployment (`mcp-server-4-production-b6ec`) rejected unauthenticated and wrong-token handshakes (`auth_enforced: true`), the gate passed, and the Week 42 pulse (`6cac28a6…`) was appended to the Doc and created as a draft (both `succeeded` in the ledger; `email_sent: false`). A later, corrected Week 42 pulse (`84d6f68b…`) is `blocked_week_already_delivered` on both targets.
+**Security gate** (decision, Phase 5): live delivery is refused unless `MCP_AUTH_TOKEN` is set **and** the server is observed rejecting unauthenticated clients. There is no override flag. On 2026-10-14 the original deployment (`mcp-server-4-production-0fca`) accepted a handshake with no credentials, so delivery to it was refused. On 2026-10-17 the configured Railway deployment (`mcp-server-4-production-b6ec`) rejected unauthenticated and wrong-token handshakes (`auth_enforced: true`), the gate passed, and the Week 42 pulse (`6cac28a6…`) was appended to the Doc and created as a draft (both `succeeded` in the ledger; `email_sent: false`). A later, corrected Week 42 pulse (`84d6f68b…`) is `blocked_week_already_delivered` on both targets, so it was not delivered again.
 
 ### 6.7 Interfaces (CLI and dashboard)
 
@@ -441,8 +441,8 @@ processing runs.
 
 | Deployment | What runs | Notes |
 |---|---|---|
-| **Streamlit Community Cloud** (dashboard) | `app/streamlit_app.py` from `feature/streamlit-dashboard-week-lock` | Dependencies from the repository's lock / `requirements.txt`. Secrets as root-level TOML keys (`LLM_PROVIDER="groq"`, `GROQ_API_KEY`), exposed as environment variables. `data/` is not deployed, so the app shows the committed read-only `snapshot/` (§6.8) and disables preview and delivery. No pipeline stage runs here |
-| **Railway** (MCP server) | The Google Workspace MCP server (`mcp-server-4`, Node.js), a separate project | Streamable HTTP at the root path `/`. Enforces bearer-token auth (observed 2026-10-17). Holds the Google OAuth tokens. Called by the CLI, or a local dashboard, with `MCP_AUTH_TOKEN` over HTTPS |
+| **Streamlit Community Cloud** (dashboard) | `app/streamlit_app.py` from `feature/streamlit-dashboard-week-lock`, at <https://groww-review-pulse-agent-2nza7oxgal2ywzeqg36n9m.streamlit.app/> | Dependencies from the repository's lock / `requirements.txt`. Secrets as root-level TOML keys (`LLM_PROVIDER="groq"`, `GROQ_API_KEY`), exposed as environment variables. `data/` is not deployed, so the app shows the committed read-only `snapshot/` (§6.8) and disables preview and delivery. No pipeline stage runs here |
+| **Railway** (MCP server) | The Google Workspace MCP server (`mcp-server-4`, Node.js), a separate project, at `https://mcp-server-4-production-b6ec.up.railway.app/` | Streamable HTTP at the root path `/`. Enforces bearer-token auth (observed 2026-10-17: handshakes without credentials and with a wrong token rejected, security gate passed). Holds the Google OAuth tokens. Called by the CLI, or a local dashboard, with `MCP_AUTH_TOKEN` over HTTPS |
 
 Not built: hosting this agent on Railway (Dockerfile, persistent ledger volume, weekly cron
 running the pipeline). Earlier drafts proposed it.

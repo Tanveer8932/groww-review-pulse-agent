@@ -2,10 +2,12 @@
 
 | Field | Value |
 |---|---|
-| Document status | Draft v1 |
-| Last updated | 2026-10-14 |
+| Document status | Draft v1; requirements unchanged, as-built status in §11 |
+| Last updated | 2026-10-19 (§10 statuses and §11 as-built status added; requirements as written on 2026-10-14) |
 | Owner | Groww Review Pulse Agent team |
 | Related docs | [architecture.md](architecture.md), [implementation-plan.md](implementation-plan.md) |
+
+> **As built (2026-10-19).** Reviews enter only through file import, not live collection. Import, preprocessing, Groq analysis, and report generation run through the `groww-pulse` CLI, not through browser controls. The Streamlit Community Cloud dashboard shows a verified, read-only snapshot. Where this statement asks for more (Goal 7, FR-1, FR-22, FR-23), §11 records what was built.
 
 ---
 
@@ -134,9 +136,34 @@ The project is done when:
 | # | Item | Status |
 |---|---|---|
 | A1 | The existing MCP server (`saksham20189575/mcp-server-4`) exposes `google_docs_append_content` and `gmail_create_draft`, and also `gmail_send_email`, which must be blocked | **Verified 2026-10-14** via `tools/list`; see [mcp-contract.md](mcp-contract.md) |
-| A2 | The deployed server at `https://mcp-server-4-production-0fca.up.railway.app/` speaks MCP over Streamable HTTP | **Verified**: the endpoint is the root path `POST /`, protocol `2025-11-25` |
-| A3 | The deployed server holds Google OAuth tokens on its side, and its authenticated Google account can edit the target Doc | **Partly open**: server-side tokens confirmed from source. Which account, token validity, and Doc access need a test write |
-| A4 | Whether and how clients must authenticate to the deployed MCP server | **Verified: no client auth** (`auth_enforced: false`), and the OAuth routes lack a `state` check. A fix is proposed in [mcp-server-security.md](mcp-server-security.md); production delivery is gated on it. The client still supports an optional bearer token |
+| A2 | The deployed server at `https://mcp-server-4-production-0fca.up.railway.app/` speaks MCP over Streamable HTTP | **Verified**: the endpoint is the root path `POST /`, protocol `2025-11-25`. Delivery later used a separate Railway deployment with bearer auth, `https://mcp-server-4-production-b6ec.up.railway.app/` (same server name, protocol, and contract; observed 2026-10-17) |
+| A3 | The deployed server holds Google OAuth tokens on its side, and its authenticated Google account can edit the target Doc | **Verified for the configured Doc (2026-10-17)**: a real `google_docs_append_content` call returned `ok: true`, `status: appended`, and `gmail_create_draft` returned `status: draft_created`. Which Google account the server uses still cannot be verified from the client |
+| A4 | Whether and how clients must authenticate to the deployed MCP server | **Original deployment (`…-0fca`, 2026-10-14): no client auth** (`auth_enforced: false`), and the OAuth routes lack a `state` check. **Railway deployment used for delivery (`…-b6ec`, 2026-10-17): bearer auth enforced.** Handshakes without credentials and with a wrong token were rejected, and the client's security gate passed. See [mcp-server-security.md](mcp-server-security.md) |
 | A5 | The MCP server offers no tool to read a Doc or list drafts, so idempotency must use a local or persistent run ledger | **Verified** via `tools/list` |
-| A6 | A permitted source of Groww reviews for 8–12 weeks is available, either an export or an approved collector | **Proposed**: export-only; automated collector rejected. Approval pending; see [data-source-decision.md](data-source-decision.md) |
+| A6 | A permitted source of Groww reviews for 8–12 weeks is available, either an export or an approved collector | **Open**: export-only; automated collector rejected. The real run used 73 reviews that the operator collected manually from the public listing and parsed offline. There is no Play Console authorization, licence, or legal review; see [data-source-decision.md](data-source-decision.md) |
 | A7 | Hinglish (romanized Hindi) reviews are common and are treated as non-English unless the detector is confident they are English | Policy decision; can be revisited |
+
+## 11. As-Built Status (2026-10-19)
+
+This section records what was built and evidenced. It does not change the requirements above.
+
+### Definition of Done (§9)
+
+| Criterion | Status | Evidence |
+|---|---|---|
+| End-to-end run on real, permitted data passes every validator | **Partly met** | A real run (as of 2026-10-14; 73 reviews, window 2026-07-23 to 2026-10-14) produced the 2026-W42 pulse: 211 words, 3 themes, 3 verified quotes, 3 actions, no PII, all 6 validators passing. The data source is **not approved** (A6), and the actual review dates (2026-07-24 to 2026-09-19) leave the last 3.5 weeks of the window empty |
+| Doc append and Gmail draft confirmed by MCP responses and a manual check | **Partly met** | On 2026-10-17 the server confirmed both: Doc `appended`, draft `draft_created`. No record of a manual look at the Doc or the Drafts folder is in the repository |
+| No email sent; send tool blocked and tested | **Met** | `email_sent: false` in every delivery record; `gmail_send_email` raises `ForbiddenToolError` before any network call (tested) |
+| Re-running the same week causes no duplicate delivery | **Met** | A second `publish --confirm` of the same pulse gave `skipped_already_delivered` on both targets. A corrected Week 42 pulse (`84d6f68b…`) was not delivered again because of duplicate-week protection (`blocked_week_already_delivered`) |
+| Streamlit app deployed and reachable; health check confirms MCP tool discovery | **Partly met** | Deployed on Streamlit Community Cloud at <https://groww-review-pulse-agent-2nza7oxgal2ywzeqg36n9m.streamlit.app/> as a read-only snapshot. Delivery and the MCP health check are disabled there by design (no ledger in the cloud). The MCP health check (`initialize` + `tools/list` + auth probe) runs from the CLI and a local dashboard, and passed inside the 2026-10-17 publish |
+| All tests pass in CI; documentation matches what was built | **Not met in CI** | Locally on 2026-10-19: 989 passed, 3 skipped (opt-in live tests). The GitHub Actions run stops at its secret-scan step, which flags the SHA-256 digests in `snapshot/` (pre-commit exempts them; the CI step does not), so CI never reaches the tests |
+
+### Goals and requirements built differently
+
+| Item | As built |
+|---|---|
+| Goal 1, FR-1 (collect) | No collector. Google Play's robots.txt and Google's Terms rule it out, so `groww-pulse collect` always refuses. Reviews enter only through `groww-pulse import` (FR-2) |
+| Goal 7, FR-22 (Streamlit UI that runs the pipeline) | The dashboard reads stored results only. It has no upload widget, window selector, or run-stage buttons. Import, preprocessing, Groq analysis, and report generation run only through the CLI. A local dashboard can deliver through the same publisher as the CLI; the hosted dashboard cannot |
+| Goal 7 (deploy to Streamlit Cloud or Railway) | The dashboard is on Streamlit Community Cloud. The MCP server, not this agent, runs on Railway |
+| FR-23 (CLI for scheduled use) | Per-stage CLI commands exist. There is no single `run` command and no scheduler |
+| LLM provider | Groq Cloud (`openai/gpt-oss-120b`); Anthropic is a supported alternative |

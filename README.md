@@ -10,8 +10,8 @@ Apple App Store reviews are out of scope.
 | | |
 |---|---|
 | GitHub repository | <https://github.com/Tanveer8932/groww-review-pulse-agent> (branch `feature/streamlit-dashboard-week-lock`) |
-| Dashboard (Streamlit Community Cloud) | Deployed from this repository and branch; read-only snapshot. The public app URL is not recorded in the repository yet (see [Documentation gaps](#documentation-gaps)) |
-| MCP server (Railway) | `https://mcp-server-4-production-b6ec.up.railway.app/`: a Railway deployment of the Google Workspace MCP server (`mcp-server-4`). It rejects requests without a valid bearer token |
+| Dashboard (Streamlit Community Cloud) | <https://groww-review-pulse-agent-2nza7oxgal2ywzeqg36n9m.streamlit.app/>: deployed from this repository and branch. It shows the committed, verified read-only snapshot of the 2026-W42 pulse; it runs no pipeline stage and cannot deliver |
+| MCP server (Railway) | `https://mcp-server-4-production-b6ec.up.railway.app/`: a Railway deployment of the Google Workspace MCP server (`mcp-server-4`) with bearer auth. On 2026-10-17 it rejected handshakes without credentials and with a wrong token (`auth_enforced: true`, security gate passed) |
 
 Documentation:
 - [Problem statement](docs/problemStatement.md)
@@ -313,7 +313,7 @@ groww-pulse export-snapshot                           # read-only snapshot for t
 | Tests | `pytest` |
 | Lint and format | `ruff check . && ruff format --check .` |
 | Type check | `mypy` |
-| Secret scan | `detect-secrets-hook --baseline .secrets.baseline $(git ls-files)` |
+| Secret scan | `pre-commit run detect-secrets --all-files` (uses the baseline and the snapshot-digest exemption in `.pre-commit-config.yaml`) |
 | Render a specific analysis | `groww-pulse report --analysis data/runs/<run_id>/analysis.json` |
 | Deliver a specific pulse | `groww-pulse publish --pulse data/runs/<run_id> [--confirm]` |
 | Re-deliver after an unknown outcome (after checking the Doc and Drafts) | `groww-pulse publish --confirm --force` |
@@ -409,7 +409,7 @@ only as set / not set.
 
 ## Test results
 
-Run on 2026-10-19 on Windows, Python 3.11, at commit `61870f9`:
+Run locally on 2026-10-19 on Windows, Python 3.11, at commit `da4477d` (application code unchanged since `61870f9`):
 
 | Check | Result |
 |---|---|
@@ -418,6 +418,7 @@ Run on 2026-10-19 on Windows, Python 3.11, at commit `61870f9`:
 | `ruff check`, `ruff format --check` | Clean |
 | `mypy` (strict; `src`, `scripts`, `app`) | Clean |
 | pre-commit (including `detect-secrets` and `detect-private-key`) | All hooks pass |
+| GitHub Actions CI (`.github/workflows/ci.yml`) | **Failing** on this branch since `61870f9`. Lint and type check pass, but the CI secret-scan step flags the SHA-256 digests in `snapshot/` as high-entropy strings: it does not pass the `--exclude-lines` rule that pre-commit uses. The job stops there, so CI does not run the tests |
 
 Unit tests mock the LLM and MCP. MCP tests use a fake server that serves the tool
 definitions recorded from the real server. Test fixtures are synthetic and labelled. The
@@ -434,8 +435,8 @@ Taken from the local run records (`data/`, gitignored) and the committed snapsho
 | 2026-10-15 | `analyze`, `report` | Groq `openai/gpt-oss-120b`, LLM themes (no fallback); Week 42 pulse, content hash `6cac28a6…` |
 | 2026-10-17 | Confirmed publish (`DELIVERY_MODE=confirm`) | Health check inside the publish: Railway MCP server healthy, `auth_enforced: true`, security gate passed. Google Doc: **delivered**. Gmail draft: **delivered**. `email_sent: false` |
 | 2026-10-17 | `publish --confirm` again | Both targets `skipped_already_delivered`, with no new append or draft |
-| 2026-10-17 | `report` (corrected Week 42) | New content hash `84d6f68b…`, 211 words, all validators pass. Both targets `blocked_week_already_delivered` by duplicate-week protection, so it was **not** delivered |
-| 2026-10-18 | `export-snapshot` | The corrected Week 42 pulse committed in `snapshot/` for the hosted dashboard |
+| 2026-10-17 | `report` (corrected Week 42) | New content hash `84d6f68b…`, 211 words, all validators pass. A dry run was the only `publish` of this version; the ledger has no delivery for it |
+| 2026-10-18 | `export-snapshot` | The corrected Week 42 pulse committed in `snapshot/` for the hosted dashboard. Its recorded delivery status is `blocked_week_already_delivered` on both targets (duplicate-week protection), so it was **not** delivered again |
 
 The delivered version (`6cac28a6…`) no longer re-renders under the current report code, so
 the dashboard and the snapshot show the corrected version (`84d6f68b…`). Their delivery
@@ -479,6 +480,9 @@ status is "blocked: another version of this week was already delivered".
   the full pulse, not a Doc link.
 - **Trust in the MCP server.** The client verifies that the server enforces bearer auth. It
   cannot verify which Google account the server uses.
+- **CI is red.** The GitHub Actions secret-scan step lacks the snapshot-digest exemption
+  that pre-commit has, so CI fails before its test step (see [Test results](#test-results)).
+  The fix is a one-line workflow change, not yet made.
 
 ## Assignment deliverables
 
@@ -488,13 +492,13 @@ status is "blocked: another version of this week was already delivered".
 | Tests | `tests/` (unit, integration, labelled synthetic fixtures); CI in `.github/workflows/ci.yml` |
 | Weekly pulse of at most 250 words (real data) | [`snapshot/runs/20261017T064855Z-4dc798/pulse.md`](snapshot/runs/20261017T064855Z-4dc798/pulse.md) |
 | Google Doc append and Gmail draft | Delivered through the Railway MCP server on 2026-10-17 (see [Evidence](#evidence-from-the-real-run)) |
-| Deployed dashboard | Streamlit Community Cloud, read-only snapshot |
+| Deployed dashboard | <https://groww-review-pulse-agent-2nza7oxgal2ywzeqg36n9m.streamlit.app/> (Streamlit Community Cloud, read-only snapshot) |
 | Architecture and design | This README and [docs/architecture.md](docs/architecture.md) |
 | Problem statement, plan, data-source decision, MCP contract, security assessment | [docs/](docs/) |
 
 ### Verifying the prototype
 
-1. **Hosted dashboard:** open the Streamlit Cloud app. Expect the "Read-only snapshot of
+1. **Hosted dashboard:** open <https://groww-review-pulse-agent-2nza7oxgal2ywzeqg36n9m.streamlit.app/>. Expect the "Read-only snapshot of
    the 2026-W42 pulse" banner, 211 words, all validators passing, 3 themes, 3 quotes, 3
    actions, and the funnel 73 → 67. The Delivery tab shows both targets as blocked
    (already delivered) and no delivery controls.
@@ -510,7 +514,9 @@ status is "blocked: another version of this week was already delivered".
 
 ### Documentation gaps
 
-- The public Streamlit Community Cloud URL is not recorded here. Add it to the table at the
-  top.
+- The hosted dashboard's content was not re-checked from the command line for this
+  revision: a non-browser request to the URL is redirected to Streamlit's sign-in page
+  (`/-/login`). If reviewers are asked to sign in, set the app's sharing to public in
+  Streamlit Community Cloud.
 - The Google Doc and the Gmail draft from 2026-10-17 are evidenced by the MCP tool
   responses in the run records. No screenshot or manual-check record is in the repository.

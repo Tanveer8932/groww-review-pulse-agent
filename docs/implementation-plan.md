@@ -3,7 +3,7 @@
 | Field | Value |
 |---|---|
 | Document status | Draft v1 |
-| Last updated | 2026-10-14 |
+| Last updated | 2026-10-19 (overview and [As-built status](#as-built-status-2026-10-19) updated; per-phase status sections keep their own dates) |
 | Related docs | [problemStatement.md](problemStatement.md), [architecture.md](architecture.md) |
 
 Scope reminder: **Google Play only. Apple App Store is excluded** from every phase below.
@@ -17,13 +17,28 @@ Scope reminder: **Google Play only. Apple App Store is excluded** from every pha
 | 0 | Foundation and verification spikes **(engineering complete; external approvals pending; see status)** | Repo skeleton, config, CI, verified MCP contract, data-source decision | — |
 | 1 | Review collection and import **(implemented; first real import done 2026-10-14: 73/73 accepted from a manually collected file; source NOT approved, see data-source-decision.md §7)** | Canonical `reviews_raw.jsonl` from CSV/JSON/JSONL exports (collector is a disabled guard) | 0 |
 | 2 | Preprocessing and privacy **(implemented and revised 2026-10-14: lexical language rescue, PII rules v2, whole-token Hinglish markers, automatic and manual quote holds; real-data validation done on 73 reviews: 67 kept, 60 quote-eligible)** | Filtered, deduplicated, redacted `reviews.jsonl` + funnel | 1 |
-| 3 | AI analysis **(implemented; tested with mocked LLM on synthetic fixtures; regression-tested after the Phase 2 revision; live-LLM and real-data validation pending)** | ≤ 5 themes, top 3, verified quotes, 3 actions | 2 |
-| 4 | Report generation and validation **(implemented; tested on labelled synthetic fixtures; NOT production-validated: no real data)** | ≤ 250-word pulse that passes all validators | 3 |
-| 5 | MCP delivery **(implemented; tested against a fake MCP server; live read-only check done; live delivery BLOCKED by the security gate: the deployed server is unauthenticated)** | Doc append + Gmail draft, idempotent, send blocked | 0 (contract), 4 |
-| 6 | Streamlit UI and orchestration **(dashboard and publish panel implemented 2026-10-17; orchestrator, `run` command, and upload/run-stage pages not started)** | UI + CLI driving the full pipeline | 1–5 |
-| D | Deployment | Running app on Railway (and/or Streamlit Cloud) | 6 |
+| 3 | AI analysis **(implemented; run once on real data 2026-10-15 with Groq `openai/gpt-oss-120b`, LLM themes, no fallback)** | ≤ 5 themes, top 3, verified quotes, 3 actions | 2 |
+| 4 | Report generation and validation **(implemented; real 2026-W42 pulse passes all validators: 211 words, 3/3/3, no PII)** | ≤ 250-word pulse that passes all validators | 3 |
+| 5 | MCP delivery **(implemented; real delivery 2026-10-17 through the bearer-auth Railway deployment: Doc appended, Gmail draft created, no email sent)** | Doc append + Gmail draft, idempotent, send blocked | 0 (contract), 4 |
+| 6 | Streamlit UI and orchestration **(dashboard and publish panel implemented 2026-10-17; duplicate-week lock and read-only snapshot 2026-10-18; orchestrator, `run` command, and upload/run-stage pages not started)** | UI + CLI driving the full pipeline | 1–5 |
+| D | Deployment **(dashboard on Streamlit Community Cloud as a read-only snapshot; Railway hosting of this agent not built)** | Running app on Railway (and/or Streamlit Cloud) | 6 |
 
 Phase 5's MCP client can be built in parallel with Phases 2–4 once the Phase 0 contract is verified.
+
+## As-built status (2026-10-19)
+
+The per-phase "Status" sections below are dated records and are not rewritten. Where a later run changed an outcome, a dated **Update** note is added next to it. The current state:
+
+| Area | State | Evidence |
+|---|---|---|
+| Processing | Import, preprocessing, Groq analysis, and report generation run only through the `groww-pulse` CLI, one stage at a time. No dashboard has browser controls for them | CLI commands in the [README](../README.md#cli-commands) |
+| Real run | 73 reviews imported 2026-10-14 (`--as-of 2026-10-14`), 67 kept, 60 quote-eligible; analysis 2026-10-15 with Groq `openai/gpt-oss-120b` (LLM themes, no fallback); 2026-W42 pulse passing all validators | Local run records (`data/`, gitignored); committed `snapshot/` |
+| Dataset provenance | Collected manually from the public Google Play listing and parsed offline. **Not approved**: no Play Console authorization, licence, or legal review. Actual review dates 2026-07-24 to 2026-09-19 | [data-source-decision.md](data-source-decision.md) |
+| MCP server | Railway deployment `https://mcp-server-4-production-b6ec.up.railway.app/` with bearer auth. On 2026-10-17 it rejected handshakes without credentials and with a wrong token; `tools/list` had no send tool; the security gate passed | [mcp-server-security.md §6](mcp-server-security.md#6-railway-deployment-with-bearer-auth-verified-2026-10-17) |
+| Delivery | 2026-10-17: the Week 42 pulse `6cac28a6…` was appended to the Google Doc (`appended`) and created as a Gmail draft (`draft_created`); `email_sent: false`. A repeat `publish --confirm` skipped both targets. The corrected Week 42 pulse `84d6f68b…` was **not** delivered again: duplicate-week protection marks both targets `blocked_week_already_delivered` | Ledger `data/runs/ledger.jsonl` (local); `snapshot/snapshot.json` |
+| Hosted dashboard | Streamlit Community Cloud at <https://groww-review-pulse-agent-2nza7oxgal2ywzeqg36n9m.streamlit.app/>. Shows the committed, verified read-only snapshot of the corrected Week 42 pulse. Preview, delivery, and the MCP health check are disabled there | [architecture.md §6.8 and §9](architecture.md#68-read-only-dashboard-snapshot-snapshotpy) |
+| Tests | Local 2026-10-19: 989 passed, 3 skipped (opt-in live tests), 97% coverage. GitHub Actions CI fails at its secret-scan step (snapshot SHA-256 digests flagged; the CI step lacks pre-commit's exemption), so CI does not reach the tests | [README test results](../README.md#test-results) |
+| Not built | Orchestrator and `groww-pulse run`; upload and run-stage pages; scheduling; hosting this agent on Railway (Dockerfile, persistent ledger volume, cron); a smoke script; a recorded manual check of the Doc and Drafts | — |
 
 ### Cross-cutting rules (every phase)
 - Type hints on all public functions. `mypy --strict` on `src/`. `ruff` lint and format.
@@ -512,9 +527,9 @@ Holds on the real data (7):
 
 ### Acceptance criteria
 The criteria that name real data are **not met**. The others are met with a mocked LLM on synthetic fixtures only and must be re-confirmed on the first real run (see "Real-data validation status" below).
-- [ ] *(needs real data)* On real preprocessed data: 1–5 themes, each with ≥ 1 member, every review assigned to a theme or `other`. *(Mechanism proven on synthetic data: `test_end_to_end_analysis`.)*
+- [x] *(needs real data)* On real preprocessed data: 1–5 themes, each with ≥ 1 member, every review assigned to a theme or `other`. *(Mechanism proven on synthetic data: `test_end_to_end_analysis`.)* **Update 2026-10-15:** met on the 67 real reviews with Groq (LLM themes, no fallback).
 - [x] The top 3 are selected with a displayed, reproducible score. *(`test_theme_stats_are_exact`, `test_ranking_order_tie_breaks_and_exclusions`, `test_ranking_tie_on_score_breaks_by_count`; the formula is written into `analysis.json`)*
-- [ ] *(needs real data)* Exactly 3 quotes, each a verified verbatim substring of a stored, redacted, **real** review. *(Mechanism proven on synthetic data, including raw-store provenance: `test_end_to_end_analysis`, the quote verification tests.)*
+- [x] *(needs real data)* Exactly 3 quotes, each a verified verbatim substring of a stored, redacted, **real** review. *(Mechanism proven on synthetic data, including raw-store provenance: `test_end_to_end_analysis`, the quote verification tests.)* **Update 2026-10-15:** met on the real run; the quotes are re-verified in the 2026-W42 pulse.
 - [x] Exactly 3 concrete actions tied to the top themes. *(`test_valid_actions_pass`, `test_invalid_actions_are_rejected`, `test_generate_actions_repairs_invented_numbers_and_orders_by_rank`)*
 - [x] A re-run with the same inputs uses the cache and yields identical analysis. *(`test_rerun_uses_cache_and_is_identical`: 0 provider calls, identical `analysis_sha256`)*
 - [x] No unredacted text is sent to the LLM. *(`test_no_unredacted_text_reaches_the_llm`: a planted phone number is in the raw store but in no captured prompt, and every data-block value scans clean)*
@@ -729,7 +744,7 @@ Any failure raises a typed error, and **no `analysis.json` is written**.
 ### Acceptance criteria
 Mechanism criteria are met on labelled synthetic fixtures. **Every criterion that says "real" is not met**, because no real review data exists yet.
 - [x] The pulse renders in at most 250 words, with exactly 3 themes, 3 verbatim quotes, and 3 actions. *(Synthetic only: `test_report_end_to_end`, `test_phases_one_to_four`, the word-limit boundary and shrink tests.)*
-- [ ] *(needs real data)* All validators pass on a **real** run. *(Mechanism: any failure blocks writing and names each failed check and reason; proven by 40+ refusal tests.)*
+- [x] *(needs real data)* All validators pass on a **real** run. *(Mechanism: any failure blocks writing and names each failed check and reason; proven by 40+ refusal tests.)* **Update 2026-10-17:** the corrected 2026-W42 pulse (`84d6f68b…`, 211 words) passes all 6 validators.
 - [x] The rendered pulse contains no PII. *(Synthetic only: `no_pii` validator, `test_pii_anywhere_in_the_report_fails_safely`, `test_pii_in_rendered_report_fails_safely`; the planted phone number never appears.)*
 
 ### Status — 2026-10-14: **implemented and tested on labelled synthetic fixtures; NOT production-validated (no real data)**
@@ -837,6 +852,8 @@ Review IDs appear only in `pulse.json`, for audit, and never in the pulse body.
 
 Building and unit-testing the Phase 5 client against a fake MCP server is not blocked.
 
+**Update 2026-10-17:** both gates cleared. A real, validated pulse exists, and the bearer-auth Railway deployment passed the security gate (see [As-built status](#as-built-status-2026-10-19)).
+
 ---
 
 ## Phase 5 — MCP Delivery
@@ -871,12 +888,12 @@ Building and unit-testing the Phase 5 client against a fake MCP server is not bl
 - Live integration test (`@pytest.mark.live`) against the deployed server, using a test Doc and the operator's own address. It runs manually and is never in CI.
 
 ### Acceptance criteria
-**No Google Doc has been appended to and no Gmail draft has been created by this code.** Every write in the tests went to an in-process fake MCP server.
+*As of 2026-10-14:* **no Google Doc had been appended to and no Gmail draft created by this code.** Every write in the tests went to an in-process fake MCP server. **Update 2026-10-17:** one real delivery succeeded through the bearer-auth Railway deployment (see the criteria below).
 - [x] `check-mcp` passes against the deployed server via `tools/list`. Root-URL reachability alone never passes. *(Live, read-only, 2026-10-14: healthy, protocol `2025-11-25`, contract compatible. The opt-in test `test_phase5_client_health_and_security_gate` passed. A fake answering 200 without MCP is reported unhealthy.)*
-- [ ] *(blocked)* A confirmed publish appends the pulse to the configured Google Doc, confirmed by both the MCP response and a manual look at the Doc. **Not attempted:** the security gate blocks it (see "What remains"). *(Mechanism proven against the fake server only.)*
-- [ ] *(blocked)* A Gmail draft exists with the pulse, confirmed by both the MCP response and a manual look at Drafts. **Not attempted**, same blocker.
+- [ ] *(partly met)* A confirmed publish appends the pulse to the configured Google Doc, confirmed by both the MCP response and a manual look at the Doc. **Update 2026-10-17:** the MCP response confirms it (`ok: true`, `status: appended`, 1,364 characters). No record of the manual look is in the repository.
+- [ ] *(partly met)* A Gmail draft exists with the pulse, confirmed by both the MCP response and a manual look at Drafts. **Update 2026-10-17:** the MCP response confirms it (`ok: true`, `status: draft_created`); `email_sent: false`. No record of the manual look is in the repository.
 - [x] No email is sent in any test or run, and the send tool is unreachable from code. *(The allowlist raises `ForbiddenToolError` before any I/O, and the fake receives 0 calls. A static test shows the send tool's name exists as code only in `contract.py`. No code path sends.)*
-- [x] Re-publishing the same week is skipped and reported as such. *(Fake server: 0 HTTP requests on the second run.)*
+- [x] Re-publishing the same week is skipped and reported as such. *(Fake server: 0 HTTP requests on the second run.)* **Update 2026-10-17:** confirmed live: the repeat `publish --confirm` reported `skipped_already_delivered` on both targets. Since 2026-10-18, a pulse with different content for an already delivered week is `blocked_week_already_delivered`, and `--force` does not override it.
 - [x] Failures show the server's error code and masked message, and nothing is reported as delivered unless the server said so. *(Fake server: `isError` → `failed`; malformed or ambiguous → `outcome_unknown`; `delivered` only on `ok: true` plus the expected status.)*
 
 ### Status — 2026-10-14: **implemented and tested against a fake MCP server; live delivery BLOCKED by the security gate; no real Doc append or draft yet**
@@ -979,7 +996,7 @@ Building and unit-testing the Phase 5 client against a fake MCP server is not bl
   - our own typed errors raised inside a session (`ForbiddenToolError`, contract changed) came back wrapped in the SDK's `ExceptionGroup`; they are now unwrapped;
   - the Phase 4 number echo described above.
 
-**What remains before live Google Docs and Gmail testing** (in order; all need the operator or the MCP server owner):
+**What remained before live Google Docs and Gmail testing** (as of 2026-10-14; in order; all need the operator or the MCP server owner). **Update 2026-10-17:** a bearer-auth deployment passed the health check and security gate inside the publish, a real pulse was produced with Groq (not Anthropic), and steps 7 and 9 were run with the results above. The repository does not record whether the configured Doc and recipient were test targets (step 4), whether step 5 was run, the manual check in step 8, or step 10.
 1. **Fix the MCP server's authentication (blocker).** The deployed server must reject clients without a valid bearer token: Step 1 of [mcp-server-security.md](mcp-server-security.md), or the operator's own hardened fork. Step 0.1 (`GOOGLE_TOKENS_JSON`) and Step 3 (lock down the OAuth routes) are strongly recommended first, so the authorized Google account cannot be swapped. Until then, `publish --confirm` raises `SecurityGateError` by design.
 2. **Issue a client key** and set `MCP_AUTH_TOKEN` (environment or secret store only).
 3. Run `groww-pulse check-mcp`. Expect `healthy: true`, `auth_enforced: true`, and `security_gate_passed: true`. Ideally `gmail_send_email` no longer appears in `forbidden_tools_present` (server Step 2).
@@ -996,7 +1013,7 @@ Building and unit-testing the Phase 5 client against a fake MCP server is not bl
 10. Only then point `GOOGLE_DOC_ID` and `PULSE_EMAIL_TO` at the production Doc and recipients. Those are new idempotency keys, so the pulse is delivered once more.
 
 **Known limitations:**
-1. **No real write has been verified.** Response parsing follows the server source (mcp-contract.md §4) and the fake. The real envelope is confirmed only after step 5 or 8 above.
+1. **Real writes verified once.** Response parsing followed the server source (mcp-contract.md §4) and the fake. **Update 2026-10-17:** the real responses (`appended`, `draft_created`) parsed as `succeeded`.
 2. **The gate trusts what it observes.** A server that rejects only header-less clients and wrong tokens passes. Which Google account the server uses still can't be verified from the client (S3 in the security assessment).
 3. **Unknown outcomes need a human.** There is no read tool, so after `outcome_unknown` the operator must check the Doc and Drafts before `--force`. `--force` can create a duplicate if the write did happen.
 4. **The ledger is local and unlocked.** Run one publish at a time. On ephemeral disks (Streamlit Cloud) idempotency is per-session. Deleting `data/runs/ledger.jsonl` loses idempotency history.
@@ -1094,6 +1111,9 @@ Building and unit-testing the Phase 5 client against a fake MCP server is not bl
 - Smoke script (`scripts/smoke.py`) runs against the deployed URL after each deploy. It is dry-run only.
 - One manual confirmed publish against the test Doc and draft after the first deployment, with the result recorded in the deployment log.
 
+### Status — 2026-10-19
+The dashboard is deployed on Streamlit Community Cloud at <https://groww-review-pulse-agent-2nza7oxgal2ywzeqg36n9m.streamlit.app/> from `feature/streamlit-dashboard-week-lock`, showing the committed read-only snapshot. Delivery from it is disabled by design, because the cloud has no ledger. Deliverables 1, 3, 4 (smoke script), and 5, the Docker CI build, and hosting this agent on Railway are **not built**. The only Railway service is the MCP server. Deliverable 2 exists as `requirements.txt`, exported from `uv.lock`; there is no `.streamlit/secrets.toml.example`, and the secrets are documented in the README instead. The weekly run is manual.
+
 ### Acceptance criteria
 - [ ] The deployed app is reachable, and the smoke checks pass, including the MCP handshake (not just the root URL).
 - [ ] Secrets live only in the platform secret store, and nothing sensitive is in the image or repo.
@@ -1128,7 +1148,7 @@ External dependencies: the deployed MCP server (separately owned), the LLM provi
 | R2 | MCP endpoint path or auth differ from assumptions; server is down or redeployed | Med | High | Phase 0 contract spike; `check-mcp` before every publish; configurable URL and token; clear `MCPUnavailableError` |
 | R3 | Accidental email send via `gmail_send_email` | Low | Critical | Code allowlist, a test proving it is blocked, no UI control, LLM has no tool access |
 | R4 | Duplicate Doc appends (no read-back tool; retries) | Med | Med | Ledger keyed by week and hash; no retries on tool errors; separate keys per target; audit marker line |
-| R5 | Ephemeral disk (Streamlit Cloud) loses the ledger | High (on SC) | Med | Railway volume for production; UI warning; confirmation for each publish |
+| R5 | Ephemeral disk (Streamlit Cloud) loses the ledger | High (on SC) | Med | As built: the hosted dashboard has no ledger and delivery from it is disabled; delivery runs only from the operator's machine. A Railway volume was planned for production but not built |
 | R6 | LLM hallucinated quotes or numbers | Med | High | Quotes extracted by code; numbers computed by code; validators fail closed |
 | R7 | PII leakage (Indian identifiers, names in free text) | Med | High | Redaction before the LLM; output scan; test corpus; raw store retention limit |
 | R8 | Hinglish and code-mixed reviews skew the English sample | High | Med | Confidence threshold; funnel shows the share excluded; policy revisit noted |
@@ -1137,7 +1157,7 @@ External dependencies: the deployed MCP server (separately owned), the LLM provi
 | R11 | Prompt injection inside review text | Low | Med | Delimited data blocks; schema validation; no LLM tool access |
 | R12 | LLM cost or rate limits | Low | Med | Batching, caching, token budget, backoff |
 | R13 | The Docs scope can edit any accessible Doc, so the wrong document could be targeted | Low | High | Single configured `GOOGLE_DOC_ID`; format validation; test Doc for live tests |
-| R14 | **The deployed MCP server is unauthenticated, and its OAuth routes lack a `state` check.** Third parties can send mail, append to Docs, or swap the server's Google account (observed 2026-10-14) | High | Critical | Server-side fix proposed in [mcp-server-security.md](mcp-server-security.md); no production delivery until it is fixed or a hardened fork is deployed; `check_mcp.py` reports `auth_enforced`; client allowlist |
+| R14 | **The deployed MCP server is unauthenticated, and its OAuth routes lack a `state` check.** Third parties can send mail, append to Docs, or swap the server's Google account (observed 2026-10-14) | High | Critical | Server-side fix proposed in [mcp-server-security.md](mcp-server-security.md); no production delivery until it is fixed or a hardened fork is deployed; `check_mcp.py` reports `auth_enforced`; client allowlist. **Update 2026-10-17:** delivery uses the bearer-auth Railway deployment `…-b6ec`, which passed the security gate. Residual: the server's Google account and OAuth-route settings are not verified from the client |
 | R15 | The 3–7 day Play Console posting lag leaves the newest days of the window missing | High | Low | Record the actual window end (latest date in the data); optional owner-only API top-up for the last 7 days |
 
 ---
